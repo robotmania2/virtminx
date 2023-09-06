@@ -1,0 +1,1149 @@
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+<style>
+td {padding:0;}
+.no {display:none;}
+div {border-style:solid;border-width:0;}
+</style>
+<script type="text/javascript">
+<!--
+
+// options from the menu
+var colorScheme="mf8", puzzle="megaminx", pEvent="single";
+var solveCheck = false;
+var colors = ["#888888","#FF92BB","#00ff00","#FFFF66", "#FF8600","#70DBDB","#0000ff","#ff0000", "#ffff00","#00bb00","#5C246E","#ffffff", "black", "white"];
+
+var s=1; // size of cube
+var r1=1, r2=2, l1=1, l2=2; // handshifting
+var cwidth=500, cheight=500; // size of canvas
+var cnt=0; // move count
+
+var stickers = [];
+var c;
+var corners=[], edges=[], centers=[], view=[];
+
+// minx stuff
+var FACE_U = 0, FACE_F = 1, FACE_LU = 2, FACE_RU = 3, FACE_LB = 4,
+    FACE_RB = 5, FACE_LF = 6, FACE_RF = 7, FACE_LD = 8, FACE_RD = 9,
+    FACE_B = 10, FACE_D = 11;
+var adj = [[1,2,4,5,3],[0,3,7,6,2],[0,1,6,8,4],[1,0,5,9,7],
+           [0,2,8,10,5],[0,4,10,9,3],[1,7,11,8,2],[1,3,9,11,6],
+           [6,11,10,4,2],[7,3,5,10,11],[5,4,8,11,9],[6,7,9,10,8]];
+
+var times = [];
+var avgLengths = [5,12,100];
+var bestAverages = [[],[],[]]; // best of 5, 12, 100
+var nCurrent, nTotal; // for marathon and relay
+var startTime;
+var curTime;
+var timerID;
+var inspectionID;
+var started = false;
+var solving = false;
+
+var browser = getBrowser(); // only want to call this once
+
+window.onkeydown=function(event){doKey(event)};
+
+/**********************
+ * CONTROL & GRAPHICS *
+ **********************/
+
+function init() {
+ clearInterval(inspectionID); // just in case
+ document.bgColor = colors[12];
+ document.fgColor = colors[13];
+ 
+ changedSolveCheck();
+ changedHideStats();
+ $('sizeText').value = s;
+ $('moves').innerHTML = "";
+ showProgress();
+ 
+ c = $('c').getContext('2d');
+ $('c').height = cheight;
+ $('c').width = cwidth;
+ $('cube').height = cheight;
+ $('cube').width = cwidth;
+ 
+ setToSolved();
+ 
+ draw();
+ cnt = 0;
+}
+
+function setToSolved() {
+ for (var i=0; i<12; i++) {
+  view[i] = i;
+ }
+ if (puzzle == "megaminx") {
+  for (var i=0; i<12; i++) {
+   corners[i] = [];
+   edges[i] = [];
+   for (var j=0; j<5; j++) {
+    corners[i][j] = [];
+    edges[i][j] = [];
+    for (var k=0; k<s; k++) {
+     corners[i][j][k] = [];
+     edges[i][j][k] = i;
+     for (var l=0; l<s; l++) {
+      corners[i][j][k][l] = i;
+     }
+    }
+   }
+  }
+ } else if (puzzle == "even") {
+  for (var i=0; i<12; i++) {
+   corners[i] = [];
+   for (var j=0; j<5; j++) {
+    corners[i][j] = [];
+    for (var k=0; k<s; k++) {
+     corners[i][j][k] = [];
+     for (var l=0; l<s; l++) {
+      corners[i][j][k][l] = i;
+     }
+    }
+   }
+  }
+ } else if (puzzle == "crystal") {
+  for (var i=0; i<12; i++) {
+   corners[i] = [];
+   edges[i] = [];
+   for (var j=0; j<5; j++) {
+    corners[i][j] = [];
+    edges[i][j] = [];
+    for (var k=0; k<s; k++) {
+     corners[i][j][k] = [];
+     edges[i][j][k] = i;
+     for (var l=0; l<s; l++) {
+      corners[i][j][k][l] = i;
+     }
+    }
+   }
+  }
+ } else if (puzzle == "ultimate") {
+  for (var i=0; i<12; i++) {
+   corners[i] = [];
+   edges[i] = [];
+   centers[i] = i;
+   for (var j=0; j<5; j++) {
+    corners[i][j] = [];
+    edges[i][j] = [];
+    for (var k=0; k<s; k++) {
+     corners[i][j][k] = i;
+    }
+    for (var k=0; k<s-1; k++) {
+     edges[i][j][k] = [];
+ 	 for (var l=0; l<s-k-1; l++) { 
+	  edges[i][j][k][l] = i;
+	 }
+    }
+   }
+  }
+ }
+}
+
+
+function draw() {
+ var center, length;
+ var p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15;
+
+ center = [cwidth/2, cheight/2];
+ length = Math.min(cwidth,cheight) * 0.3;
+
+ p1 = add(center, [0, length]);
+ p2 = add(center, [-.95106*length, .30902*length]);
+ p3 = add(center, [-.58779*length, -.80902*length]);
+ p4 = add(center, [.58779*length, -.80902*length]);
+ p5 = add(center, [.95106*length, .30902*length]);
+ p6 = add(center, [0, 1.61803*length]);
+ p7 = add(center, [.95106*length, 1.30902*length]);
+ p8 = add(center, [1.53884*length, .5*length]);
+ p9 = add(center, [1.53884*length, -.5*length]);
+ p10 = add(center, [.95106*length, -1.30902*length]);
+ p11 = add(center, [0, -1.61803*length]);
+ p12 = add(center, [-.95106*length, -1.30902*length]);
+ p13 = add(center, [-1.53884*length, -.5*length]);
+ p14 = add(center, [-1.53884*length, .5*length]);
+ p15 = add(center, [-.95106*length, 1.30902*length]);
+
+ drawFace(p1, p5, p4, p3, p2, FACE_F, FACE_RF, FACE_RU, FACE_U, FACE_LU, FACE_LF);
+ drawFace(p1, p6, p7, p8, p5, FACE_RF, FACE_LF, FACE_D, FACE_RD, FACE_RU, FACE_F);
+ drawFace(p5, p8, p9, p10, p4, FACE_RU, FACE_RF, FACE_RD, FACE_RB, FACE_U, FACE_F);
+ drawFace(p4, p10, p11, p12, p3, FACE_U, FACE_RU, FACE_RB, FACE_LB, FACE_LU, FACE_F);
+ drawFace(p3, p12, p13, p14, p2, FACE_LU, FACE_U, FACE_LB, FACE_LD, FACE_LF, FACE_F);
+ drawFace(p2, p14, p15, p6, p1, FACE_LF, FACE_LU, FACE_LD, FACE_D, FACE_RF, FACE_F);
+}
+
+function drawFace(v1, v2, v3, v4, v5, f0, f1, f2, f3, f4, f5) {
+ var p = [v1,v2,v3,v4,v5];
+ var f = [view[f1], view[f2], view[f3], view[f4], view[f5]];
+ var e = view[f0];
+ 
+ if (puzzle == "megaminx") {
+  // define the ten vectors
+  var v = [];
+  for (var i=0; i<5; i++) {
+   v[i*2] = mul(sub(p[(i+1)%5], p[i]), 1/(2*s+1));
+   v[i*2+1] = mul(sub(p[(i+4)%5], p[i]), 1/(2*s+1));
+  }
+
+  for (var i=0; i<5; i++) {
+   var x0 = v[i*2], x1 = v[i*2+1];
+   var y0 = v[((i+4)%5)*2], y1 = v[((i+4)%5)*2+1];
+   // draw the corners
+   for (var j=0; j<s; j++) {
+    for (var k=0; k<s; k++) {
+     var base = add(p[i], mul(x0, j), mul(x1, k));
+     drawPoly4(base, add(base,x0), add(base,x0,x1), add(base,x1),
+      colors[corners[e][getIndex(e, f[i%5])][j][k]]);
+    }
+   }
+   // draw the edges
+   for (var j=0; j<s; j++) {
+    var base1 = add(p[i], mul(x1, s), mul(x0, j));
+    var base2 = add(p[(i+4)%5], mul(y0, s), mul(y1, j));
+    drawPoly4(base1, add(base1,x0), add(base2,y1), base2,
+     colors[edges[e][getIndex(e, f[(i+4)%5])][j]]);
+   }
+  }
+  // draw the center
+  drawPoly5(add(p[0], mul(v[0], s), mul(v[1], s)),
+            add(p[1], mul(v[2], s), mul(v[3], s)),
+            add(p[2], mul(v[4], s), mul(v[5], s)),
+            add(p[3], mul(v[6], s), mul(v[7], s)),
+            add(p[4], mul(v[8], s), mul(v[9], s)), colors[e]);
+ } else if (puzzle == "even") {
+  // define the ten vectors
+  var v = [];
+  var ce = mul(add(v1,v2,add(v3,v4,v5)),0.2);
+  for (var i=0; i<5; i++) {
+   v[i*2] = mul(sub(p[(i+1)%5], p[i]), 1/(2*s-1));
+   v[i*2+1] = mul(sub(p[(i+4)%5], p[i]), 1/(2*s-1));
+  }
+
+  for (var i=0; i<5; i++) {
+   var x0 = v[i*2], x1 = v[i*2+1];
+   var y0 = v[((i+4)%5)*2], y1 = v[((i+4)%5)*2+1];
+   // draw the cornercorners
+   for (var j=0; j<s-1; j++) {
+    for (var k=0; k<s-1; k++) {
+     var base = add(p[i], mul(x0, j), mul(x1, k));
+     drawPoly4(base, add(base,x0), add(base,x0,x1), add(base,x1),
+      colors[corners[e][getIndex(e, f[i%5])][j][k]]);
+    }
+   }
+   // draw the edgecorners
+   for (var j=0; j<s-1; j++) {
+    var tc = mul(add(v[(i*2+1)%10],v[(i*2+2)%10]),0.5);
+    var base = add(p[i], mul(x0, s-1));
+    drawPoly4(add(base,mul(x1,j)), add(base,mul(x0,.5),mul(tc,j)),
+              add(base,mul(x0,.5),mul(tc,j+1)), add(base,mul(x1,j+1)),
+     colors[corners[e][getIndex(e, f[i])][s-1][j]]);
+    tc = mul(add(v[(i*2)%10],v[(i*2+9)%10]),0.5);
+    base = add(p[i], mul(x1, s-1));
+    drawPoly4(add(base,mul(x0,j)), add(base,mul(x1,.5),mul(tc,j)),
+              add(base,mul(x1,.5),mul(tc,j+1)), add(base,mul(x0,j+1)),
+     colors[corners[e][getIndex(e, f[i])][j][s-1]]);
+   }
+   // draw the centercorners
+   drawPoly4(add(p[i],mul(x0,s-1),mul(x1,s-1)),
+    add(p[i],mul(x0,s-.5),mul(add(v[(i*2+1)%10],v[(i*2+2)%10]),(s-1)/2)),
+    ce, add(p[i],mul(x1,s-.5),mul(add(v[(i*2+9)%10],v[i*2]),(s-1)/2)),
+    colors[corners[e][getIndex(e, f[i])][s-1][s-1]]);
+  }
+ } else if (puzzle == "crystal") {
+  // Define the other points
+  var ce = mul(add(v1,v2,add(v3,v4,v5)),0.2);
+  var v = [v1,v2,v3,v4,v5];
+  var pa = [], pb = [];
+  for (i=0; i<5; i++) {
+   j = (i+1)%5;
+   pa.push(add(v[i],mul(sub(v[j],v[i]),0.27787)));
+   pb.push(add(v[j],mul(sub(v[i],v[j]),0.27787)));
+  }
+
+  if (s == 1) {
+   // Draw the stickers
+   for (i=0; i<5; i++) {
+    drawPoly4(v[i], pa[i], ce, pb[(i+4)%5], colors[corners[e][getIndex(e, f[i])][0][0]]);
+	drawPoly3(pa[i], pb[i], ce, colors[edges[e][getIndex(e, f[i])][0]]);
+   }
+  } else if (s == 2) {
+   // More points
+   var px = [], py = [], pz = [];
+   for (i=0; i<5; i++) {
+	k = (i+4)%5;
+    px.push(sub(add(pa[i],pb[k]),v[i]));
+   }
+   for (i=0; i<5; i++) {
+    j = (i+1)%5;
+   	py.push(add(px[i],mul(sub(px[j],px[i]),0.27787)));
+    pz.push(add(px[j],mul(sub(px[i],px[j]),0.27787)));
+   }
+ 			
+   // Draw the stickers
+   for (i=0; i<5; i++) {
+    drawPoly4(v[i], pa[i], px[i], pb[(i+4)%5], colors[corners[e][getIndex(e, f[i])][0][0]]);
+	drawPoly3(pa[i], px[i], py[i], colors[corners[e][getIndex(e, f[i])][1][0]]);
+	drawPoly3(pb[(i+4)%5], px[i], pz[(i+4)%5], colors[corners[e][getIndex(e, f[i])][0][1]]);
+	drawPoly4(px[i], py[i], ce, pz[(i+4)%5], colors[corners[e][getIndex(e, f[i])][1][1]]);
+	drawPoly4(pa[i], pb[i], pz[i], py[i], colors[edges[e][getIndex(e, f[i])][0]]);
+	drawPoly3(py[i], pz[i], ce, colors[edges[e][getIndex(e, f[i])][1]]);
+   }
+  } 
+ } else if (puzzle == "ultimate") {
+  // Define the other points
+  var pe = [];
+  var v = [v1,v2,v3,v4,v5];
+  for (i=0; i<5; i++) {
+   pe[i] = [];
+   for (j=0; j<s; j++) {
+    pe[i][j] = [];
+   }
+  }
+  for (j=0; j<s; j++) {
+   for (k=0; k<(s-j); k++) {
+	if(j==0) {
+	 // first set of edge points
+	 for (i=0; i<5; i++) {
+	  pe[i][j][k] = add(v[i], mul(sub(v[(i+1)%5],v[i]),(k+1)/(s+1)));
+	 }
+	} else {
+	 for (i=0; i<5; i++) {
+	  pe[i][j][k] = add(pe[i][j-1][k+1], mul(sub(pe[(i+4)%5][0][s-1],pe[i][0][0]), 0.381966));
+	 }
+	}
+   }
+  }
+		
+  // Draw the corners
+  for (i=0; i<5; i++) {
+   drawPoly3(v[i], pe[i][0][0], pe[(i+4)%5][0][s-1], colors[corners[e][getIndex(e, f[i])][0]]);
+   for (j=0; j<s-1; j++) {
+    drawPoly4(pe[i][j][0], pe[i][j+1][0], pe[(i+4)%5][j+1][s-j-2], pe[(i+4)%5][j][s-j-1], colors[corners[e][getIndex(e, f[i])][j+1]]);
+   }
+  }
+  
+  // Draw the edges
+  for (i=0; i<5; i++) {
+   for (j=0; j<(s-1); j++) {
+    for (k=0; k<(s-j-1); k++) {
+     if (j>0) {
+      drawPoly4(pe[i][j-1][k+1], pe[i][j][k], pe[i][j+1][k], pe[i][j][k+1], colors[edges[e][getIndex(e, f[i])][k][j]]);
+	 } else {
+	  drawPoly3(pe[i][j][k], pe[i][j+1][k], pe[i][j][k+1], colors[edges[e][getIndex(e, f[i])][k][j]]);
+	 }
+    }
+   }
+  }
+			
+  // Draw the center
+  drawPoly5(pe[0][s-1][0], pe[1][s-1][0], pe[2][s-1][0], pe[3][s-1][0], pe[4][s-1][0], colors[centers[e]]);
+ }
+}
+
+function drawPoly3(v1, v2, v3, color) {
+ c.strokeStyle = "#000";
+ c.fillStyle = color;
+ c.beginPath();
+ c.moveTo(v1[0], v1[1]);
+ c.lineTo(v2[0], v2[1]);
+ c.lineTo(v3[0], v3[1]);
+ c.lineTo(v1[0], v1[1]);
+ c.closePath();
+ c.fill();
+ c.stroke();
+}
+
+function drawPoly4(v1, v2, v3, v4, color) {
+ c.strokeStyle = "#000";
+ c.fillStyle = color;
+ c.beginPath();
+ c.moveTo(v1[0], v1[1]);
+ c.lineTo(v2[0], v2[1]);
+ c.lineTo(v3[0], v3[1]);
+ c.lineTo(v4[0], v4[1]);
+ c.lineTo(v1[0], v1[1]);
+ c.closePath();
+ c.fill();
+ c.stroke();
+}
+
+function drawPoly5(v1, v2, v3, v4, v5, color) {
+ c.strokeStyle = "#000";
+ c.fillStyle = color;
+ c.beginPath();
+ c.moveTo(v1[0], v1[1]);
+ c.lineTo(v2[0], v2[1]);
+ c.lineTo(v3[0], v3[1]);
+ c.lineTo(v4[0], v4[1]);
+ c.lineTo(v5[0], v5[1]);
+ c.lineTo(v1[0], v1[1]);
+ c.closePath();
+ c.fill();
+ c.stroke();
+}
+
+function getIndex(face, other) {
+ for (var i=0; i<5; i++)
+  if (adj[face][i] == other) return i;
+ return -1;
+}
+
+function move(face, amount, layer, redraw) {
+ if (layer > s) layer = s;
+ for (var i=0; i<layer; i++) {
+  movelet(view[face], amount, i);
+ }
+ 
+ if (redraw) draw();
+ if (redraw && solving) {
+  cnt++;
+  startTimer();
+ }
+}
+
+
+function doKey(e) {
+ var keyCode = 0;
+ if (e.keyCode) {
+  keyCode = e.keyCode;
+ } else if (e.which) {
+  keyCode = e.which;
+ }
+ var shift = e.shiftKey;
+ var shmod = (shift ? 1 : 0); // shift modifier for layers
+ if (keyCode == 32 || keyCode == 9) { // prevent normal handling of space and tab key
+  if (e.stopPropagation) {
+   e.stopPropagation();
+  }
+  e.preventDefault();
+ }
+
+ // space to scramble
+ if (keyCode == 32) {
+  l1 = 1;
+  l2 = 2;
+  r1 = 1;
+  r2 = 2;
+  showHands();
+  if (solving) {
+   if (isSolved()) {
+    finishSolve();
+   }
+  } else {
+   if (pEvent == "relay") {
+    s = 1;
+	nCurrent = 1;
+	init();
+   } else {
+    nCurrent = 0;
+   }
+   showProgress();
+   scramble();
+   cnt = 0;
+   inspectionID = setTimeout(startTimer, 15000);
+   started = false;
+   solving = true;
+  }
+ }
+
+ //i k = R R'
+ else if (keyCode == 73) move(FACE_RU, 1, 1, r1+shmod, true);
+ else if (keyCode == 75) move(FACE_RU, 4, 1, r1+shmod, true);
+ //j f = U U'
+ else if (keyCode == 74) move(FACE_U, 1, 1, 1+shmod, true);
+ else if (keyCode == 70) move(FACE_U, 4, 1, 1+shmod, true);
+ //d e = L L'
+ else if (keyCode == 68) move(FACE_LU, 1, 1, l1+shmod, true);
+ else if (keyCode == 69) move(FACE_LU, 4, 1, l1+shmod, true);
+ //u m = r r'
+ else if (keyCode == 85) move(FACE_RU, 1, 1, r2+shmod, true);
+ else if (keyCode == 77) move(FACE_RU, 4, 1, r2+shmod, true);
+ //v r = l l'
+ else if (keyCode == 86) move(FACE_LU, 1, 1, l2+shmod, true);
+ else if (keyCode == 82) move(FACE_LU, 4, 1, l2+shmod, true);
+ //h g = F F'
+ else if (keyCode == 72) move(FACE_F, 1, 1, 1+shmod, true);
+ else if (keyCode == 71) move(FACE_F, 4, 1, 1+shmod, true);
+ //s l = D D'
+ else if (keyCode == 83) move(FACE_RF, 1, 1, 1+shmod, true);
+ else if (keyCode == 76) move(FACE_RF, 4, 1, 1+shmod, true);
+ //; a = [U] [U]'
+ else if (keyCode == 59 || ((browser == "Chrome" || browser == "IE") && keyCode == 186)) rotate(FACE_U, 1);
+ else if (keyCode == 65) rotate(FACE_U, 4);
+ //w o = B B'
+ else if (keyCode == 87) move(FACE_RB, 1, 1, 1+shmod, true);
+ else if (keyCode == 79) move(FACE_RB, 4, 1, 1+shmod, true);
+ //y n = [R] [R]'
+ else if (keyCode == 89) rotate(FACE_RU, 1);
+ else if (keyCode == 78) rotate(FACE_RU, 4);
+ //t b = [L]' [L]
+ else if (keyCode == 84) rotate(FACE_LU, 4);
+ else if (keyCode == 66) rotate(FACE_LU, 1);
+ //p q = [F] [F]'
+ else if (keyCode == 80) rotate(FACE_F, 1);
+ else if (keyCode == 81) rotate(FACE_F, 4);
+
+ //+ - for cube size
+ else if (!shift && (keyCode == 107 || keyCode == 61 || ((browser == "Chrome" || browser == "IE") && keyCode == 187)))
+  changeS(s+1);
+ else if (!shift && s>1 && (keyCode == 109 || keyCode == 173 || ((browser == "Chrome" || browser == "IE") && keyCode == 189)))
+  changeS(s-1);
+
+ //shift + - for square size
+ else if (shift && (keyCode == 107 || keyCode == 61 || ((browser == "Chrome" || browser == "IE") && keyCode == 187)))
+  changeDimensions(cwidth+20, cheight+20);
+ else if (shift && (keyCode == 109 || keyCode == 173 || ((browser == "Chrome" || browser == "IE") && keyCode == 189)))
+  changeDimensions(cwidth-20, cheight-20);
+
+ //7 8 for Rin Rout
+ else if (keyCode == 55) {
+  r2++;
+  if(!shift) r1++;
+  showHands();
+ }
+ else if (keyCode == 56) {
+  if (shift && (r2-r1) > 1) r2--;
+  if (!shift && r1 > 1) {r2--; r1--;}
+  showHands();
+ }
+
+ //4 3 for Lin Lout
+ else if (keyCode == 52) {
+  l2++;
+  if(!shift) l1++;
+  showHands();
+ }
+ else if (keyCode == 51) {
+  if (shift && (l2-l1) > 1) l2--;
+  if (!shift && l1 > 1) {l2--; l1--;}
+  showHands();
+ }
+ 
+ //< > for marathon length
+ else if (keyCode == 188 && shift && nTotal>1 && pEvent=="marathon") {nTotal--; showProgress();}
+ else if (keyCode == 190 && shift && pEvent=="marathon") {nTotal++; showProgress();}
+
+ //escape to reset
+ else if (keyCode == 27) {
+  if(solving) {
+   var agree = confirm("Are you SURE? This will stop the timer!");
+   if (!agree) return;
+  }
+  reset();
+ }
+}
+
+function finishSolve() {
+ if (pEvent == "single") {
+  stopTimer(true);
+  started = false;
+  solving = false;
+ } else if (pEvent == "marathon") {
+  nCurrent++;
+  showProgress();
+  if (nCurrent >= nTotal) {
+   stopTimer(true);
+   started = false;
+   solving = false;
+  } else {
+   scramble();
+   started = true;
+   solving = true;
+  }
+ } else if (pEvent == "relay") {
+  nCurrent = s;
+  showProgress();
+  if (nCurrent < nTotal) {
+   s++;
+   init();
+   scramble();
+   started = true;
+   solving = true;
+  } else {
+   stopTimer(true);
+   started = false;
+   solving = false;
+  }
+ }
+}
+
+function reset() {
+ if (pEvent=="relay") {
+  s = nTotal;
+ }
+ showProgress();
+ nCurrent = 0;
+ if (solving && puzzle != "timer") clearTimes();
+ stopTimer(false);
+ solving = false;
+ started = false;
+ init();
+}
+
+function changedPuzzle() {
+ var obj = $('puzzle');
+ puzzle = obj.options[obj.selectedIndex].value;
+ if (puzzle == "crystal" && s > 2) s = 2;
+ 
+ reset();
+ clearTimes();
+ changedColor(); // start with unmodified color scheme
+}
+
+function changedEvent() {
+ if (pEvent=="relay") {
+  s = nTotal;
+ }
+ var obj = $('pEvent');
+ pEvent = obj.options[obj.selectedIndex].value;
+ if (pEvent=="marathon") {
+  nCurrent = 0;
+  nTotal = 42; // default
+ } else if (pEvent=="relay") {
+  nCurrent = 0;
+  nTotal = s;
+ }
+ reset();
+ clearTimes();
+}
+
+function changedColor() {
+ var obj = $('colors');
+ colorScheme = obj.options[obj.selectedIndex].value;
+ 
+ // if you're reading this, feel free to make a custom color scheme!
+ // first 12: side colors; 13: bg color; 14: text color
+ colors = ["#101010","#FF92BB","#00ff00","#FFFF66", "#FF8600","#70DBDB","#0000ff","#ff0000", "#ffff00","#00bb00","#5C246E","#ffffff", "black", "white"]; // mf8
+ if (colorScheme == "mefferts") {
+  colors = ["#ffff00","#ff00ff","#0000ff","#00ff00", "#ff7522","#b20000","#00ffcc","#ff0000", "#00b200","#0080ff","#0a1262","#ffffff", "black", "white"];
+ } else if (colorScheme == "isominxsim") {
+  colors = ["#ffff00","#ff82e8","#0000c6","#00ff00", "#ff0000","#ffbe2b","#07ffe6","#c48342", "#00b952","#2c8aff","#d20096","#ffffff", "black", "white"];
+ } else if (colorScheme == "gelatinbrain") {
+  colors = ["#ffff00","#ff00ff","#0000ff","#00ff00", "#ff0000","#ff7522","#00ffcc","#b20000", "#00b200","#0080ff","#0a1262","#ffffff", "black", "white"];
+ }
+ draw();
+ document.bgColor = colors[12];
+ document.fgColor = colors[13];
+}
+
+function changedSolveCheck() {
+ solveCheck = $('solveCheck').checked;
+}
+
+function changedHideStats() {
+ $('stats').style.display = ($('hideStats').checked) ? "none" : ""; 
+}
+
+function changedSize() {
+ var newSize = parseInt($('sizeText').value);
+ changeS(newSize);
+}
+
+function changeS(newS) {
+ if(solving) {
+  var agree = confirm("Are you SURE? This will stop the timer!");
+  if (!agree) return;
+ }
+ if (newS < 1) newS = 1;
+ if (newS == s) return;
+ 
+ if (puzzle == "crystal" && newS > 2) return;
+ 
+ stopTimer(false);
+ solving = false;
+ s = newS;
+ if (pEvent == "relay") nTotal = s;
+ $('sizeText').value = s;
+ init();
+ clearTimes();
+}
+
+function changeDimensions(newWidth, newHeight) {
+ cwidth = newWidth;
+ cheight = newHeight;
+ c = $('c').getContext('2d');
+ $('c').height = cheight;
+ $('c').width = cwidth;
+ $('cube').height = cheight;
+ $('cube').width = cwidth;
+ draw();
+}
+
+function showHands() {
+ $('hands').innerHTML = l1 + " " + l2 + " | " + r2 + " " + r1;
+}
+
+function showProgress() {
+ if (pEvent == "single") {
+  $('progress').innerHTML = "";
+ } else {
+  $('progress').innerHTML = nCurrent + "/" + nTotal + " cube" + (nTotal==1?"":"s");
+ }
+}
+
+/******************
+ * PUZZLE DETAILS *
+ ******************/
+ 
+function move(face, amount, layermin, layermax, update) {
+ if (layermax > s) layermax = s;
+ if (layermin < 1) layermin = 1;
+ var rotation = (layermin==1 && layermax==s);
+ for (var i=layermin-1; i<layermax; i++) {
+  movelet(view[face], amount, i);
+ }
+ 
+ if (update) draw();
+ if (update && solving) {
+  cnt++;
+  startTimer();
+  if (solveCheck) {
+   if (isSolved()) {
+    finishSolve();
+   }
+  }
+ }
+}
+
+function rotate(face, amount) {
+ for (var i=0; i<(5-amount); i++) {
+  var temp = view[adj[face][0]];
+  view[adj[face][0]] = view[adj[face][1]];
+  view[adj[face][1]] = view[adj[face][2]];
+  view[adj[face][2]] = view[adj[face][3]];
+  view[adj[face][3]] = view[adj[face][4]];
+  view[adj[face][4]] = temp;
+  temp = view[11 - adj[face][0]];
+  view[11 - adj[face][0]] = view[11 - adj[face][1]];
+  view[11 - adj[face][1]] = view[11 - adj[face][2]];
+  view[11 - adj[face][2]] = view[11 - adj[face][3]];
+  view[11 - adj[face][3]] = view[11 - adj[face][4]];
+  view[11 - adj[face][4]] = temp;
+ }
+ draw();
+}
+
+function movelet(face, amount, layer) {
+ // arrays for various swaps
+ var facearr = [face, face, face, face, face];
+ var adjarr = [];
+ for (i=0; i<5; i++) {
+  adjarr.push([adj[face][i], adj[face][(i+1)%5], adj[face][(i+2)%5],
+               adj[face][(i+3)%5], adj[face][(i+4)%5]]);
+ }
+ 
+ if (puzzle == "megaminx") {
+  // swap stickers
+  edgeSwap(amount, adjarr[0], facearr, layer);
+  for (var j=0; j<s; j++) {
+   cornerSwap(amount, adjarr[0], facearr, j, layer);
+   cornerSwap(amount, adjarr[0], adjarr[1], layer, j);
+  }
+
+  // turn face
+  if (layer == 0) {
+   for (var i=0; i<s; i++) {
+    edgeSwap(amount, facearr, adjarr[0], i);
+    for (var j=0; j<s; j++) {
+     cornerSwap(amount, facearr, adjarr[0], i, j);
+    }
+   }
+  }
+ } else if (puzzle == "even") {
+  // swap stickers
+  for (var j=0; j<s; j++) {
+   cornerSwap(amount, adjarr[0], facearr, j, layer);
+   cornerSwap(amount, adjarr[0], adjarr[1], layer, j);
+  }
+
+  // turn face
+  if (layer == 0) {
+   for (var i=0; i<s; i++) {
+    for (var j=0; j<s; j++) {
+     cornerSwap(amount, facearr, adjarr[0], i, j);
+    }
+   }
+  }
+ } else if (puzzle == "crystal") {
+  // swap stickers
+  edgeSwap(amount, adjarr[0], facearr, layer);
+  for (var j=0; j<s; j++) {
+   cornerSwap(amount, adjarr[0], facearr, j, layer);
+   cornerSwap(amount, adjarr[0], adjarr[1], layer, j);
+  }
+
+  // turn extra edges
+  if (layer == s-1) {
+   for (var i=0; i < s; i++) {
+    edgeSwap(amount, adjarr[0], adjarr[1], i);
+    edgeSwap(amount, adjarr[0], adjarr[4], i);
+   }
+  }
+
+  // turn face
+  if (layer == 0) {
+   for (var i=0; i<s; i++) {
+    edgeSwap(amount, facearr, adjarr[0], i);
+    for (var j=0; j<s; j++) {
+     cornerSwap(amount, facearr, adjarr[0], i, j);
+    }
+   }
+  }
+ } else if (puzzle == "ultimate") {
+  var opparr = [];
+  for (i=0; i<5; i++) {
+   function opp(x) {return 11-x;}
+   opparr.push(adjarr[i].map(opp));
+  }
+ 
+  if (layer==0) {
+   // swap corners
+   for (i=0; i<s; i++) {
+    ultCornerSwap(amount, adjarr[0], facearr, i);
+    ultCornerSwap(amount, adjarr[0], adjarr[1], i);
+    ultCornerSwap(amount, facearr, adjarr[0], i);
+    ultCornerSwap(amount, adjarr[0], adjarr[4], i);
+    ultCornerSwap(amount, adjarr[0], opparr[3], i);
+   }
+   ultCornerSwap(amount, opparr[0], adjarr[3], 0);
+   
+   // swap edges
+   for (var i=0; i<s-1; i++) {
+    for (var j=0; j<s-i-1; j++) {
+     ultEdgeSwap(amount, adjarr[0], facearr, i, j);
+     ultEdgeSwap(amount, adjarr[0], adjarr[1], i, j);
+     ultEdgeSwap(amount, adjarr[0], adjarr[4], i, j);
+     ultEdgeSwap(amount, facearr, adjarr[0], i, j);
+    }
+   }
+  
+   // swap centers
+   centerSwap(amount, adjarr[0]);
+  } else {
+   // swap "corners"
+   ultCornerSwap(amount, opparr[0], adjarr[3], layer);
+   ultCornerSwap(amount, adjarr[0], opparr[2], s-layer);
+ 
+   // swap edges
+   for (i=0; i<(s-layer); i++) {
+    ultEdgeSwap(amount, adjarr[0], opparr[2], s-layer-i-1, i);
+    ultEdgeSwap(amount, adjarr[0], opparr[3], layer-1, i);
+   }
+   for (i=0; i<layer; i++) {
+    ultEdgeSwap(amount, opparr[0], adjarr[2], s-layer-1, i);
+    ultEdgeSwap(amount, opparr[0], adjarr[3], i, layer-i-1);
+   }
+  }
+ }
+}
+
+function cornerSwap(amount, f1, f2, x, y) {
+ for (var i=0; i<amount; i++) {
+  var temp = corners[f1[0]][getIndex(f1[0], f2[0])][x][y];
+  corners[f1[0]][getIndex(f1[0], f2[0])][x][y] = corners[f1[4]][getIndex(f1[4], f2[4])][x][y];
+  corners[f1[4]][getIndex(f1[4], f2[4])][x][y] = corners[f1[3]][getIndex(f1[3], f2[3])][x][y];
+  corners[f1[3]][getIndex(f1[3], f2[3])][x][y] = corners[f1[2]][getIndex(f1[2], f2[2])][x][y];
+  corners[f1[2]][getIndex(f1[2], f2[2])][x][y] = corners[f1[1]][getIndex(f1[1], f2[1])][x][y];
+  corners[f1[1]][getIndex(f1[1], f2[1])][x][y] = temp;
+ }
+}
+
+function edgeSwap(amount, f1, f2, x) {
+ for (var i=0; i<amount; i++) {
+  var temp = edges[f1[0]][getIndex(f1[0], f2[0])][x];
+  edges[f1[0]][getIndex(f1[0], f2[0])][x] = edges[f1[4]][getIndex(f1[4], f2[4])][x];
+  edges[f1[4]][getIndex(f1[4], f2[4])][x] = edges[f1[3]][getIndex(f1[3], f2[3])][x];
+  edges[f1[3]][getIndex(f1[3], f2[3])][x] = edges[f1[2]][getIndex(f1[2], f2[2])][x];
+  edges[f1[2]][getIndex(f1[2], f2[2])][x] = edges[f1[1]][getIndex(f1[1], f2[1])][x];
+  edges[f1[1]][getIndex(f1[1], f2[1])][x] = temp;
+ }
+}
+
+function centerSwap(amount, f1) {
+ for (var i=0; i<amount; i++) {
+  var temp = centers[f1[0]];
+  centers[f1[0]] = centers[f1[4]];
+  centers[f1[4]] = centers[f1[3]];
+  centers[f1[3]] = centers[f1[2]];
+  centers[f1[2]] = centers[f1[1]];
+  centers[f1[1]] = temp;
+ }
+}
+
+function ultCornerSwap(amount, f1, f2, x) {
+ for (var i=0; i<amount; i++) {
+  var temp = corners[f1[0]][getIndex(f1[0], f2[0])][x];
+  corners[f1[0]][getIndex(f1[0], f2[0])][x] = corners[f1[4]][getIndex(f1[4], f2[4])][x];
+  corners[f1[4]][getIndex(f1[4], f2[4])][x] = corners[f1[3]][getIndex(f1[3], f2[3])][x];
+  corners[f1[3]][getIndex(f1[3], f2[3])][x] = corners[f1[2]][getIndex(f1[2], f2[2])][x];
+  corners[f1[2]][getIndex(f1[2], f2[2])][x] = corners[f1[1]][getIndex(f1[1], f2[1])][x];
+  corners[f1[1]][getIndex(f1[1], f2[1])][x] = temp;
+ }
+}
+
+function ultEdgeSwap(amount, f1, f2, x, y) {
+ for (var i=0; i<amount; i++) {
+  var temp = edges[f1[0]][getIndex(f1[0], f2[0])][x][y];
+  edges[f1[0]][getIndex(f1[0], f2[0])][x][y] = edges[f1[4]][getIndex(f1[4], f2[4])][x][y];
+  edges[f1[4]][getIndex(f1[4], f2[4])][x][y] = edges[f1[3]][getIndex(f1[3], f2[3])][x][y];
+  edges[f1[3]][getIndex(f1[3], f2[3])][x][y] = edges[f1[2]][getIndex(f1[2], f2[2])][x][y];
+  edges[f1[2]][getIndex(f1[2], f2[2])][x][y] = edges[f1[1]][getIndex(f1[1], f2[1])][x][y];
+  edges[f1[1]][getIndex(f1[1], f2[1])][x][y] = temp;
+ }
+}
+
+function isSolved() {
+ var isBadColor = false;
+ 
+ if (puzzle == "megaminx") {
+  // Check if all stickers are the same on each face
+  for(var i=0; i<12; i++) {
+   for(var j=0; j<5; j++) {
+    for(var k=0; k<s; k++) {
+     for (var l=0; l<s; l++) {
+      if (corners[i][j][k][l] != i) isBadColor = true;
+     }
+     if (edges[i][j][k] != i) isBadColor = true;
+    }
+   }
+  }
+ } else if (puzzle == "even") {
+  // Check if all stickers are the same on each face
+  for(var i=0; i<12; i++) {
+   for(var j=0; j<5; j++) {
+    for(var k=0; k<s; k++) {
+     for (var l=0; l<s; l++) {
+      if (corners[i][j][k][l] != corners[i][0][0][0]) isBadColor = true;
+     }
+    }
+   }
+  }
+ } else if (puzzle == "crystal") {
+  // Check if all stickers are the same on each face
+  for(var i=0; i<12; i++) {
+   for(var j=0; j<5; j++) {
+    for(var k=0; k<s; k++) {
+     for (var l=0; l<s; l++) {
+      if (corners[i][j][k][l] != edges[i][0][0]) isBadColor = true;
+     }
+     if (edges[i][j][k] != edges[i][0][0]) isBadColor = true;
+    }
+   }
+  }
+ } else if (puzzle == "ultimate") {
+  // Check if all stickers are the same on each face
+  for(var i=0; i<12; i++) {
+   for(var j=0; j<5; j++) {
+    for(var k=0; k<s; k++) {
+     if (corners[i][j][k] != centers[i]) isBadColor = true;
+    }
+    for(var k=0; k<s-1; k++) {
+     for(var l=0;l<s-k-1;l++) {
+      if (edges[i][j][k][l] != centers[i]) isBadColor = true;
+ 	 }
+    }
+   }
+  }
+ }
+ 
+ return !isBadColor;
+}
+
+function scramble() {
+ for (var i=0; i<(100*s); i++)
+  move(Math.floor(Math.random()*12), Math.floor(Math.random()*4)+1, 1, Math.floor(Math.random()*s)+1, false);
+ draw();
+}
+
+/*******************
+ * TIMER AND STATS *
+ *******************/
+
+function startTimer() {
+ clearTimeout(inspectionID);
+ if (!started) {
+  started = true;
+  startTime = new Date();
+  timerID = setInterval(updateTimer, 100);
+ }
+}
+
+function pretty(time) {
+ time = Math.round(time);
+ var mins = Math.floor(time/60000);
+ var secs = trim((time - 60000*mins)/1000, 3);
+ if (mins == 0) {
+  return secs;
+ } else {
+  return mins + (secs<10?":0":":") + secs;
+ }
+}
+
+function updateTimer() {
+ curTime = new Date();
+ var time = curTime.getTime() - startTime.getTime();
+ $('time').innerHTML = pretty(time);
+}
+
+function stopTimer(good) {
+ if (started) {
+  started = false;
+  curTime = new Date();
+  var time = curTime.getTime() - startTime.getTime();
+  $('time').innerHTML = pretty(time) + (good ? "" : "*");
+  clearInterval(timerID);
+
+  if (good) { // store the time
+   times[times.length] = time;
+   // figure out averages and display
+   var v = "";
+   
+   var min = 0;
+   for (var i=1; i<times.length; i++) {
+    if (times[i] < times[min]) min = i;
+   }
+   v += "Best time: " + pretty(times[min]) + "<br>";
+   
+   for (var i=0; i<avgLengths.length; i++) {
+    var len = avgLengths[i];
+    if (times.length >= len) {
+	 var avgData = getAvg(len, times.slice(times.length - len));
+	 v += "Current avg" + len + ": " + avgData[0] + "<br>";
+	 v += "Best avg" + len + ": ";
+	 if (times.length == len || avgData[1] < bestAverages[i][1]) {
+	  bestAverages[i] = avgData;
+	 }
+	 v += bestAverages[i][0] + "<br>";
+	}
+   }
+   $('stats').innerHTML = v;
+   $('moves').innerHTML = cnt + " moves at " + Math.round(100000*cnt/time)/100 + " moves/sec";
+  }
+ }
+}
+
+function getAvg(n, list) {
+ var max = 0;
+ var min = 0;
+ var sum = list[0];
+ for (var i=1; i<n; i++) {
+  if (list[i] > list[max]) max = i;
+  if (list[i] < list[min]) min = i;
+  sum += list[i];
+ }
+ sum = sum - list[min] - list[max];
+ var v = "";
+ for (var i=0; i<n; i++) {
+  if (i == min || i == max) {
+   v += "(" + pretty(list[i]) + ") ";
+  } else {
+   v += pretty(list[i]) + " ";
+  }
+ }
+ var avg = sum/(n-2);
+ v += "=> " + pretty(avg);
+ return [v, avg];
+}
+
+function clearTimes() {
+ times = [];
+ $('stats').innerHTML = "";
+}
+
+/********************
+ * HELPER FUNCTIONS *
+ ********************/
+
+function $(str) {return document.getElementById(str);}
+function sqrt(x){return Math.sqrt(x);}
+
+// 2D vector arithmetic
+function add(vec1, vec2, vec3) {
+ if (!vec3) {
+  return [vec1[0]+vec2[0], vec1[1]+vec2[1]];
+ } else {
+  return [vec1[0]+vec2[0]+vec3[0], vec1[1]+vec2[1]+vec3[1]];
+ }
+}
+function sub(vec1, vec2) {
+ return [vec1[0]-vec2[0], vec1[1]-vec2[1]];
+}
+function mul(vec, scal) {
+ return [vec[0]*scal, vec[1]*scal];
+}
+
+function trim(number, nDigits) {
+ if (!number || number == Number.POSITIVE_INFINITY || number == Number.NEGATIVE_INFINITY) number = 0;
+ var power = Math.pow(10, nDigits);
+ var trimmed = "" + Math.round(number * power);
+ while (trimmed.length < nDigits + 1) {
+  trimmed = "0" + trimmed;
+ }
+ var len = trimmed.length;
+ return trimmed.substr(0,len - nDigits) + "." + trimmed.substr(len - nDigits, nDigits);
+}
+
+function getBrowser() {
+ // http://www.quirksmode.org/js/detect.html
+ var versionSearchString;
+ var dataBrowser = [
+  {string:navigator.userAgent, subString:"Chrome", identity:"Chrome"},
+  {string:navigator.userAgent, subString:"Safari", identity:"Chrome"},
+  {string:navigator.userAgent, subString:"Firefox", identity:"Firefox"},
+  {string:navigator.userAgent, subString:"MSIE", identity:"IE", versionSearch:"MSIE"}];
+
+ function searchString(data) {
+  for (var i=0;i<data.length;i++) {
+   var dataString = data[i].string;
+   var dataProp = data[i].prop;
+   if (dataString) {
+    if (dataString.indexOf(data[i].subString) != -1)
+     return data[i].identity;
+   } else if (dataProp)
+    return data[i].identity;
+  }
+ };
+ 
+ return searchString(dataBrowser) || "An unknown browser";
+}
+// -->
+</script>
+</head>
+<body text="white" onload=" changedPuzzle();changedEvent();changedColor();init()">
+<div id="options" style="border:1px solid blue">
+<table style="width:100%"><tr><td>
+Puzzle Type: <select id="puzzle" onchange="changedPuzzle()">
+ <option value="megaminx" selected>megaminx</option>
+ <option value="even">even minx</option>
+ <option value="crystal">pyraminx crystal</option>
+ <option value="ultimate">pentultimate</option>
+</select></td><td>
+Event: <select id="pEvent" onchange="changedEvent()">
+ <option value="single" selected>single</option>
+ <option value="marathon">marathon</option>
+ <option value="relay">relay</option>
+</select></td><td>
+Color Scheme: <select id="colors" onchange="changedColor()">
+ <option value="mf8" selected>mf8</option>
+ <option value="mefferts">mefferts</option>
+ <option value="isominxsim">IsoMinxSim</option>
+ <option value="gelatinbrain">gelatinbrain/jfly</option>
+</select>
+</td></tr><tr><td><input type="checkbox" id="solveCheck" onchange="changedSolveCheck()" checked> Automatic solved check 
+</td><td><input type="checkbox" id="hideStats" onchange="changedHideStats()"> Hide stats 
+</td><td>Layers: <input id="sizeText" size="1" maxlength="2" onchange="changedSize()">
+</td></tr></table>
+</div>
+<br>
+<div height="1000" width="500" id="cube"><canvas id="c" /></div><br>
+<span id="time" style="font-size:200%"></span> &nbsp; 
+<span id="progress"></span><br>
+<span id="stats"></span><br>
+<span id="hands">1 2 | 2 1</span><br>
+<span id="moves"></span>
+</body>
+</html>
